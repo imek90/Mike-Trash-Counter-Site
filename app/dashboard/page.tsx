@@ -51,6 +51,24 @@ export default function Dashboard() {
     fetchData();
   }
 
+  async function deleteTrashForDate(dayIndex: number) {
+    const now = new Date();
+    const currentDayIndex = now.getDay();
+    const diff = dayIndex - currentDayIndex;
+
+    const targetDate = new Date();
+    targetDate.setDate(now.getDate() + diff);
+    targetDate.setHours(0, 0, 0, 0);
+
+    await fetch("/api/trash", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: targetDate.toISOString() }),
+    });
+
+    fetchData();
+  }
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -62,6 +80,18 @@ export default function Dashboard() {
       </div>
     );
 
+  function getISODateForDayIndex(dayIndex: number) {
+    const now = new Date();
+    const currentDayIndex = now.getDay();
+    const diff = dayIndex - currentDayIndex;
+
+    const targetDate = new Date();
+    targetDate.setDate(now.getDate() + diff);
+    targetDate.setHours(0, 0, 0, 0);
+
+    return targetDate.toISOString().split("T")[0]; // YYYY-MM-DD
+  }
+
   return (
     <main style={{ padding: 24 }}>
       <h1>Trash Tracker</h1>
@@ -69,9 +99,18 @@ export default function Dashboard() {
       <h3>Mark Trash Taken for a Day:</h3>
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         {daysOfWeek.map((day, index) => (
-          <button key={day} onClick={() => addTrashForDate(index)}>
-            {day}
-          </button>
+          <div key={day} style={{ display: "flex", gap: "4px" }}>
+            <button onClick={() => addTrashForDate(index)}>{day}</button>
+            <button
+              onClick={() => deleteTrashForDate(index)}
+              disabled={
+                !data.daily[getISODateForDayIndex(index)] ||
+                data.daily[getISODateForDayIndex(index)] === 0
+              }
+            >
+              Undo
+            </button>
+          </div>
         ))}
       </div>
 
