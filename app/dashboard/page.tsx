@@ -119,11 +119,16 @@ export default function Dashboard() {
 
       <h3>Daily Totals</h3>
       <ul>
-        {Object.entries(data.daily).map(([day, count]) => (
-          <li key={day}>
-            {day}: {count}
-          </li>
-        ))}
+        {Object.entries(data.daily)
+          .sort(
+            ([dateA], [dateB]) =>
+              new Date(dateB).getTime() - new Date(dateA).getTime()
+          )
+          .map(([day, count]) => (
+            <li key={day}>
+              {day}: {count}
+            </li>
+          ))}
       </ul>
     </main>
   );
