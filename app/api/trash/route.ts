@@ -5,83 +5,120 @@ import { TrashEntry } from "@/models/TrashEntry";
 export async function GET() {
   await connectDB();
 
-  const entries = await TrashEntry.find();
+  const entries = await TrashEntry.find().lean();
 
-  const now = new Date();
+  const daysMap: Record<
+    string,
+    {
+      date: string;
+      actions: {
+        type: string;
+        count: number;
+        approved: boolean;
+      }[];
+    }
+  > = {};
 
-  // Start of current week (Sunday)
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay());
-  startOfWeek.setHours(0, 0, 0, 0);
+  for (const entry of entries) {
+    const date = entry.date;
 
-  // Start of current month
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    if (!daysMap[date]) {
+      daysMap[date] = {
+        date,
+        actions: [],
+      };
+    }
 
-  let daily: Record<string, number> = {};
-  let weeklyTotal = 0;
-  let monthlyTotal = 0;
+    const action = daysMap[date].actions.find((a) => a.type === entry.action);
 
-  entries.forEach((e) => {
-    const entryDate = new Date(e.date); // <-- important!
-    const dayKey = entryDate.toISOString().split("T")[0];
-
-    daily[dayKey] = (daily[dayKey] || 0) + e.count;
-
-    if (entryDate >= startOfWeek) weeklyTotal += e.count;
-    if (entryDate >= startOfMonth) monthlyTotal += e.count;
-  });
+    if (action) {
+      action.count += 1;
+      action.approved = action.approved && entry.approved;
+    } else {
+      daysMap[date].actions.push({
+        type: entry.action,
+        count: 1,
+        approved: entry.approved,
+      });
+    }
+  }
 
   return NextResponse.json({
-    daily,
-    weeklyTotal,
-    monthlyTotal,
-    entries,
+    days: Object.values(daysMap),
   });
 }
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   await connectDB();
 
-  const { date, count } = await request.json();
+  const { date, type } = await req.json();
 
-  const entry = await TrashEntry.create({ date, count });
-
-  return NextResponse.json(entry);
-}
-
-export async function DELETE(request: Request) {
-  await connectDB();
-
-  const { date } = await request.json();
-
-  if (!date) {
-    return NextResponse.json({ error: "Date is required" }, { status: 400 });
+  if (!date || !type) {
+    return NextResponse.json(
+      { error: "date and type required" },
+      { status: 400 }
+    );
   }
 
-  const targetDate = new Date(date);
-  targetDate.setHours(0, 0, 0, 0);
+  await TrashEntry.create({
+    date,
+    action: type,
+    approved: false,
+  });
 
-  // Find the entry for that date
+  return NextResponse.json({ ok: true });
+}
+
+export async function PATCH(req: Request) {
+  await connectDB();
+
+  const { date, type } = await req.json();
+
+  if (!date || !type) {
+    return NextResponse.json(
+      { error: "date and type required" },
+      { status: 400 }
+    );
+  }
+
+  const entries = await TrashEntry.find({ date, action: type });
+
+  const nextApproved = !entries.every((e) => e.approved);
+
+  await TrashEntry.updateMany(
+    { date, action: type },
+    { approved: nextApproved }
+  );
+
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(req: Request) {
+  await connectDB();
+
+  const { date, type } = await req.json();
+
+  if (!date || !type) {
+    return NextResponse.json(
+      { error: "date and type required" },
+      { status: 400 }
+    );
+  }
+
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date(startOfDay);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  // Find **one entry** for this action on that day
   const entry = await TrashEntry.findOne({
-    date: {
-      $gte: targetDate,
-      $lt: new Date(targetDate.getTime() + 24 * 60 * 60 * 1000),
-    },
+    date: { $gte: startOfDay, $lte: endOfDay },
+    action: type,
   });
 
-  // Nothing to undo → return OK (idempotent)
-  if (!entry) {
-    return NextResponse.json({ ok: true });
-  }
+  if (!entry) return NextResponse.json({ ok: true });
 
-  // If count > 1, decrement
-  if (entry.count > 1) {
-    entry.count -= 1;
-    await entry.save();
-    return NextResponse.json(entry);
-  }
-
-  // If count === 1, delete the document
   await TrashEntry.deleteOne({ _id: entry._id });
 
   return NextResponse.json({ ok: true });
