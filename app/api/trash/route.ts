@@ -105,15 +105,9 @@ export async function DELETE(req: Request) {
     );
   }
 
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const endOfDay = new Date(startOfDay);
-  endOfDay.setHours(23, 59, 59, 999);
-
   // Find **one entry** for this action on that day
   const entry = await TrashEntry.findOne({
-    date: { $gte: startOfDay, $lte: endOfDay },
+    date,
     action: type,
   });
 
