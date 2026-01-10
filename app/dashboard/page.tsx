@@ -269,33 +269,63 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-3 px-6 py-6">
-            {daysOfWeek.map((day, dayIndex) => (
-              <div
-                key={day}
-                className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.06)]"
-              >
-                <div className="mb-3 space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {day}
-                  </p>
-                  <p className="text-base font-semibold text-slate-900">
-                    {getDisplayDateForDayIndex(dayIndex)}
-                  </p>
-                </div>
+            {daysOfWeek
+              .map((day, dayIndex) => ({ day, dayIndex }))
+              .sort((a, b) => {
+                const today = new Date().getDay();
+                if (a.dayIndex === today) return -1;
+                if (b.dayIndex === today) return 1;
+                return a.dayIndex - b.dayIndex;
+              })
+              .map(({ day, dayIndex }) => {
+                const isToday = dayIndex === new Date().getDay();
+                return (
+                  <div
+                    key={day}
+                    className={`rounded-xl border p-4 shadow-[0_1px_2px_rgba(15,23,42,0.06)] ${
+                      isToday
+                        ? "border-emerald-300 bg-emerald-50/80 ring-2 ring-emerald-200"
+                        : "border-slate-200 bg-slate-50/50"
+                    }`}
+                  >
+                    <div className="mb-3 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <p
+                          className={`text-xs font-semibold uppercase tracking-wide ${
+                            isToday ? "text-emerald-700" : "text-slate-500"
+                          }`}
+                        >
+                          {day}
+                        </p>
+                        {isToday && (
+                          <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
+                            Today
+                          </span>
+                        )}
+                      </div>
+                      <p
+                        className={`text-base font-semibold ${
+                          isToday ? "text-emerald-900" : "text-slate-900"
+                        }`}
+                      >
+                        {getDisplayDateForDayIndex(dayIndex)}
+                      </p>
+                    </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(actionLabels).map(([type, label]) => (
-                    <button
-                      key={type}
-                      onClick={() => addAction(dayIndex, type as TrashAction)}
-                      className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${actionStyles[type as TrashAction].button}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(actionLabels).map(([type, label]) => (
+                        <button
+                          key={type}
+                          onClick={() => addAction(dayIndex, type as TrashAction)}
+                          className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${actionStyles[type as TrashAction].button}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
           </div>
 
           <div className="border-t border-slate-200 px-6 py-3 text-xs text-slate-500">
